@@ -1,0 +1,16 @@
+# LaTeX temporary files
+*.aux
+*.log
+*.out
+*.pdf
+*.synctex.gz
+*-diff*.tex
+*-oldtmp-*.tex
+
+# macOS
+.DS_Store
+
+# Editor files
+*.swp
+*.swo
+*~
