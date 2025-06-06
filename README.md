@@ -16,10 +16,34 @@ git gtdiff intro.tex
 
 ## Installation
 
+### Quick Setup
+
 ```bash
 git clone git@github.com:abeldantas/gtdiff.git
 cd gtdiff
 ./setup.sh
+```
+
+This will add the following to your git config:
+
+```
+[alias]
+    gtdiff = !/path/to/gtdiff/gtdiff.sh
+```
+
+### Manual Setup
+
+Add this line to your `~/.gitconfig`:
+
+```
+[alias]
+    gtdiff = !/full/path/to/gtdiff/gtdiff.sh
+```
+
+Or run:
+
+```bash
+git config --global alias.gtdiff '!/full/path/to/gtdiff/gtdiff.sh'
 ```
 
 ## Usage
@@ -59,14 +83,6 @@ git gtdiff intro.tex --clean
 - `latexdiff` and `latexdiff-vc` (included in most TeX distributions)
 - `pdflatex`
 - Git repository with LaTeX files
-
-## Manual Setup
-
-If you prefer a custom location:
-
-```bash
-git config --global alias.gtdiff '!/path/to/gtdiff/gtdiff.sh'
-```
 
 ## License
 
