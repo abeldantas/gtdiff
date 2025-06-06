@@ -4,7 +4,7 @@
 # Usage: gtdiff.sh [options] [file.tex]
 
 # Default values
-REVISION="HEAD"
+REVISION=""
 GENERATE_PDF=true
 USE_TMP=true
 CLEANUP=false
@@ -68,6 +68,11 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Set default revision if not specified
+if [ -z "$REVISION" ]; then
+    REVISION="HEAD"
+fi
 
 # If no file specified, show list of modified tex files
 if [ -z "$FILE" ]; then
