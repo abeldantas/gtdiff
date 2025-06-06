@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# setup.sh - Install gtdiff aliases
+# setup.sh - Install gtdiff alias
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 GTDIFF_SCRIPT="$SCRIPT_DIR/gtdiff.sh"
 
-echo "Setting up gtdiff (Git laTex DIFF) aliases..."
+echo "Setting up gtdiff (Git laTex DIFF)..."
 
 # Check if script exists
 if [ ! -f "$GTDIFF_SCRIPT" ]; then
@@ -16,18 +16,24 @@ fi
 # Make script executable
 chmod +x "$GTDIFF_SCRIPT"
 
-# Set up git aliases
-git config --global alias.gtdiff "!$GTDIFF_SCRIPT"
-git config --global alias.gtd "!$GTDIFF_SCRIPT -p"
-git config --global alias.gtdr "!$GTDIFF_SCRIPT -r"
-git config --global alias.gtdm "!$GTDIFF_SCRIPT -m -p"
+# Remove old aliases if they exist
+git config --global --unset alias.gtd 2>/dev/null
+git config --global --unset alias.gtdr 2>/dev/null
+git config --global --unset alias.gtdm 2>/dev/null
+git config --global --unset alias.texdiff 2>/dev/null
+git config --global --unset alias.texdiff-pdf 2>/dev/null
+git config --global --unset alias.texdiff-rev 2>/dev/null
+git config --global --unset alias.texdiff-main 2>/dev/null
 
-echo "✓ Git aliases configured successfully!"
+# Set up single git alias
+git config --global alias.gtdiff "!$GTDIFF_SCRIPT"
+
+echo "✓ Git alias configured successfully!"
 echo ""
-echo "You can now use:"
-echo "  git gtdiff [options] file.tex    # Full command with options"
-echo "  git gtd file.tex                  # Quick PDF diff (most common)"
-echo "  git gtdr HEAD~1 -p file.tex       # Compare with specific revision"
-echo "  git gtdm                          # Compare entire document"
+echo "Usage:"
+echo "  git gtdiff file.tex              # Compare with HEAD and open PDF"
+echo "  git gtdiff file.tex HEAD~1       # Compare with previous commit"
+echo "  git gtdiff file.tex --no-pdf     # Only create diff file"
+echo "  git gtdiff                       # Show modified files"
 echo ""
-echo "Run 'git gtdiff -h' for help"
+echo "Run 'git gtdiff --help' for more information"

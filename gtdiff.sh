@@ -12,8 +12,8 @@
 
 # Default values
 REVISION="HEAD"
-GENERATE_PDF=false
-USE_MAIN=false
+GENERATE_PDF=true  # Default to generating PDF
+NO_PDF=false
 CLEANUP=false
 FILE=""
 
@@ -22,53 +22,62 @@ if [ -n "$GIT_PREFIX" ]; then
     cd "$GIT_PREFIX"
 fi
 
-# Parse command line options
-while getopts "r:pmch" opt; do
-    case $opt in
-        r)
-            REVISION="$OPTARG"
+# Simple usage function
+show_usage() {
+    echo "Usage: git gtdiff [file.tex] [revision] [options]"
+    echo ""
+    echo "Examples:"
+    echo "  git gtdiff intro.tex              # Compare intro.tex with HEAD and open PDF"
+    echo "  git gtdiff intro.tex HEAD~1       # Compare with previous commit"
+    echo "  git gtdiff main.tex               # Compare entire document"
+    echo "  git gtdiff                        # Show modified .tex files to choose from"
+    echo ""
+    echo "Options:"
+    echo "  --no-pdf    Don't generate PDF, only create diff file"
+    echo "  --clean     Clean up temporary files after"
+    echo "  --help      Show this help message"
+    exit 0
+}
+
+# Parse arguments more intuitively
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --help|-h)
+            show_usage
             ;;
-        p)
-            GENERATE_PDF=true
+        --no-pdf)
+            NO_PDF=true
+            GENERATE_PDF=false
+            shift
             ;;
-        m)
-            USE_MAIN=true
-            ;;
-        c)
+        --clean)
             CLEANUP=true
+            shift
             ;;
-        h)
-            echo "Usage: $0 [options] [file.tex]"
-            echo ""
-            echo "Options:"
-            echo "  -r REV    Compare with revision REV (default: HEAD)"
-            echo "  -p        Generate PDF output"
-            echo "  -m        Use main.tex with --flatten (for comparing entire document)"
-            echo "  -c        Clean up temporary files after"
-            echo "  -h        Show this help message"
-            echo ""
-            echo "Examples:"
-            echo "  $0 -p section.tex                  # Compare section.tex with HEAD and generate PDF"
-            echo "  $0 -r HEAD~1 -p section.tex        # Compare with previous commit"
-            echo "  $0 -m -p                           # Compare entire document via main.tex"
-            echo "  $0 -p -c section.tex               # Compare and clean up after"
-            exit 0
+        *.tex)
+            FILE="$1"
+            shift
             ;;
-        \?)
-            echo "Invalid option: -$OPTARG" >&2
-            exit 1
+        HEAD*|@*|main|master|origin/*|[0-9a-f]*)
+            # This looks like a revision
+            REVISION="$1"
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            show_usage
             ;;
     esac
 done
 
-# Shift to get the filename argument
-shift $((OPTIND-1))
-
-# Determine which file to use
-if [ "$USE_MAIN" = true ]; then
-    FILE="main.tex"
-else
-    FILE="${1:-main.tex}"
+# If no file specified, show modified files and help
+if [ -z "$FILE" ]; then
+    echo "Modified LaTeX files:"
+    git status --porcelain | grep '\.tex$' | grep -v diff | awk '{print "  " $2}' | sed "s|^  $GIT_PREFIX||"
+    echo ""
+    echo "Usage: git gtdiff [file.tex] [revision]"
+    echo "Example: git gtdiff intro.tex"
+    exit 1
 fi
 
 # Check if file exists
@@ -91,12 +100,20 @@ PDFFILE="${BASENAME}-diff${REVISION}.pdf"
 echo "Generating LaTeX diff for $FILE comparing with $REVISION..."
 
 # Run latexdiff-vc
-if [ "$USE_MAIN" = true ]; then
+if [ "$FILE" = "main.tex" ]; then
     # For main document, use --flatten to include all \input files
-    latexdiff-vc --git -r "$REVISION" "$FILE" --flatten
+    latexdiff-vc --git -r "$REVISION" "$FILE" --flatten 2>/dev/null || {
+        echo "Error: Failed to create diff for main.tex"
+        echo "This might happen if main.tex hasn't been modified."
+        echo "Try specifying a specific section file instead."
+        exit 1
+    }
 else
     # For individual files
-    latexdiff-vc --git -r "$REVISION" "$FILE"
+    latexdiff-vc --git -r "$REVISION" "$FILE" 2>/dev/null || {
+        echo "Error: Failed to create diff"
+        exit 1
+    }
 fi
 
 # Check if diff file was created
@@ -112,7 +129,7 @@ if [ "$GENERATE_PDF" = true ]; then
     echo "Generating PDF..."
     
     # If it's not main.tex, we need to create a wrapper document
-    if [ "$FILE" != "main.tex" ] && [ "$USE_MAIN" = false ]; then
+    if [ "$FILE" != "main.tex" ]; then
         # Create a minimal wrapper document
         WRAPPER="${BASENAME}-wrapper.tex"
         cat > "$WRAPPER" << 'EOF'
@@ -137,14 +154,16 @@ if [ "$GENERATE_PDF" = true ]; then
 \input{DIFFFILE}
 \end{document}
 EOF
-        # Replace DIFFFILE with actual filename
-        sed -i '' "s/DIFFFILE/$DIFFFILE/" "$WRAPPER"
+        # Replace DIFFFILE with actual filename (without .tex extension)
+        sed -i '' "s/DIFFFILE/${BASENAME}-diff${REVISION}/" "$WRAPPER"
         
         # Compile the wrapper
         pdflatex -interaction=nonstopmode "$WRAPPER" > /dev/null 2>&1
         
         # Rename output
-        mv "${BASENAME}-wrapper.pdf" "$PDFFILE"
+        if [ -f "${BASENAME}-wrapper.pdf" ]; then
+            mv "${BASENAME}-wrapper.pdf" "$PDFFILE"
+        fi
         
         # Clean up wrapper files
         rm -f "$WRAPPER" "${BASENAME}-wrapper.aux" "${BASENAME}-wrapper.log"
@@ -163,6 +182,8 @@ EOF
         fi
     else
         echo "Warning: PDF generation failed"
+        echo "The diff file '$DIFFFILE' was created successfully."
+        echo "You may need to compile it manually or check for LaTeX errors."
     fi
 fi
 

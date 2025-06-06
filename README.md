@@ -1,23 +1,16 @@
 # gtdiff
 
-Git laTex DIFF - A fast git integration tool for comparing LaTeX documents between different revisions using `latexdiff`.
+Git laTex DIFF - A simple git tool for comparing LaTeX documents between different revisions.
 
 ## What it does
 
-`gtdiff` allows you to quickly visualize changes in LaTeX documents by:
+`gtdiff` visualizes changes in LaTeX documents by:
 - Comparing files between your working copy and any git revision
-- Generating PDF outputs with visual diff highlighting (additions in blue, deletions in red)
-- Handling both individual section files and complete documents
-- Creating proper wrapper documents for section files that need context
+- Automatically generating and opening PDF with changes highlighted
+- Blue underwave for additions, red strikethrough for deletions
+- Smart handling of both individual files and complete documents
 
 ## Installation
-
-### Prerequisites
-- `latexdiff` and `latexdiff-vc` installed (usually comes with TeX distributions)
-- `pdflatex` for PDF generation
-- Git repository containing LaTeX files
-
-### Quick Setup
 
 ```bash
 git clone git@github.com:abeldantas/gtdiff.git
@@ -25,97 +18,52 @@ cd gtdiff
 ./setup.sh
 ```
 
-### Manual Setup
-
-If you prefer to set up manually or use a custom location:
-
-```bash
-# Basic gtdiff command with all options
-git config --global alias.gtdiff '!/path/to/gtdiff/gtdiff.sh'
-
-# Quick PDF generation (most common use case)
-git config --global alias.gtd '!/path/to/gtdiff/gtdiff.sh -p'
-
-# Compare with specific revision
-git config --global alias.gtdr '!/path/to/gtdiff/gtdiff.sh -r'
-
-# Compare entire document via main.tex
-git config --global alias.gtdm '!/path/to/gtdiff/gtdiff.sh -m -p'
-```
-
 ## Usage
 
-### Quick Commands
-
 ```bash
-# Compare a file with HEAD and view PDF (most common)
-git gtd chapter1.tex
+# Compare file with HEAD (default, most common)
+git gtdiff intro.tex
 
 # Compare with previous commit
-git gtdr HEAD~1 -p chapter1.tex
-
-# Compare entire document
-git gtdm
-```
-
-### All Commands
-
-| Alias | Description | Example |
-|-------|-------------|---------|
-| `git gtdiff` | Base command with all options | `git gtdiff -r HEAD~2 -p -c file.tex` |
-| `git gtd` | Quick PDF diff | `git gtd intro.tex` |
-| `git gtdr` | Compare with revision | `git gtdr HEAD~1 -p chapter.tex` |
-| `git gtdm` | Diff entire document | `git gtdm` |
-
-### Command Options
-
-```bash
-git gtdiff [options] [file.tex]
-
-Options:
-  -r REV    Compare with revision REV (default: HEAD)
-  -p        Generate PDF output
-  -m        Use main.tex with --flatten (for comparing entire document)
-  -c        Clean up temporary files after
-  -h        Show this help message
-```
-
-### Examples
-
-```bash
-# Quick diff with PDF
-git gtd section.tex
+git gtdiff intro.tex HEAD~1
 
 # Compare with 3 commits ago
-git gtdr HEAD~3 -p chapter.tex
+git gtdiff intro.tex HEAD~3
 
-# Compare with a branch
-git gtdr origin/main -p file.tex
+# Compare with another branch
+git gtdiff chapter.tex origin/main
 
-# Compare entire document
-git gtdm
+# Show modified .tex files
+git gtdiff
 
-# Clean up after
-git gtdiff -p -c section.tex
+# Only create diff file, don't open PDF
+git gtdiff intro.tex --no-pdf
 
-# See what changed since yesterday
-git gtdr "@{yesterday}" -p main.tex
+# Clean up temporary files after
+git gtdiff intro.tex --clean
 ```
 
-## How It Works
+## How it works
 
-1. Uses `latexdiff-vc` with git support to generate a diff file
-2. For individual section files, creates a minimal LaTeX wrapper with proper preamble
-3. Compiles the diff to PDF using `pdflatex`
-4. On macOS, automatically opens the generated PDF
-5. Optionally cleans up temporary files
+1. Uses `latexdiff-vc` to generate a visual diff
+2. Automatically compiles to PDF and opens it (macOS)
+3. For section files, creates a minimal wrapper document
+4. Handles main.tex with `--flatten` to include all `\input` files
 
-## Output
+## Requirements
 
-- **Additions** are highlighted in blue with underwave
-- **Deletions** are highlighted in red with strikethrough
-- Generated files follow the pattern: `filename-diffREVISION.pdf`
+- `latexdiff` and `latexdiff-vc` (included in most TeX distributions)
+- `pdflatex`
+- Git repository with LaTeX files
+
+## Manual Setup
+
+If you prefer a custom location:
+
+```bash
+git config --global alias.gtdiff '!/path/to/gtdiff/gtdiff.sh'
+```
 
 ## License
 
-MIT License - feel free to use and modify as needed.
+MIT License - see LICENSE file for details.
