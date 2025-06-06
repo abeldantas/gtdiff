@@ -1,6 +1,10 @@
-# gtdiff
+# Git LaTeX Diff Tool
 
-Git laTex DIFF - A simple git tool for comparing LaTeX documents between different revisions.
+Compare LaTeX documents between different revisions.
+
+```bash
+git gtdiff intro.tex
+```
 
 ## What it does
 
