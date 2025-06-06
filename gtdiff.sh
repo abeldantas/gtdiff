@@ -3,6 +3,15 @@
 # gtdiff.sh - Git laTex DIFF - Compare LaTeX files between git revisions
 # Usage: gtdiff.sh [options] [file.tex]
 
+# Add TeX binaries to PATH if they exist
+if [ -d "/usr/local/texlive/2025/bin/universal-darwin" ]; then
+    export PATH="/usr/local/texlive/2025/bin/universal-darwin:$PATH"
+elif [ -d "/usr/local/texlive/2024/bin/universal-darwin" ]; then
+    export PATH="/usr/local/texlive/2024/bin/universal-darwin:$PATH"
+elif [ -d "/usr/local/texlive/2023/bin/universal-darwin" ]; then
+    export PATH="/usr/local/texlive/2023/bin/universal-darwin:$PATH"
+fi
+
 # Default values
 REVISION=""
 GENERATE_PDF=true
@@ -83,11 +92,24 @@ if [ -z "$FILE" ]; then
     exit 0
 fi
 
+# Get absolute path of the file
+FILE_ABS=$(realpath "$FILE" 2>/dev/null || python3 -c "import os,sys; print(os.path.abspath(sys.argv[1]))" "$FILE")
+
 # Check if file exists
-if [ ! -f "$FILE" ]; then
+if [ ! -f "$FILE_ABS" ]; then
     echo "Error: File '$FILE' not found"
     exit 1
 fi
+
+# Get git root directory
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ -z "$GIT_ROOT" ]; then
+    echo "Error: Not in a git repository"
+    exit 1
+fi
+
+# Get relative path from git root
+FILE_RELATIVE=$(realpath --relative-to="$GIT_ROOT" "$FILE_ABS" 2>/dev/null || python3 -c "import os,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))" "$FILE_ABS" "$GIT_ROOT")
 
 # Get the directory of the file
 FILEDIR=$(dirname "$FILE")
@@ -97,53 +119,46 @@ BASENAME=$(basename "$FILE" .tex)
 if [ "$USE_TMP" = true ]; then
     TMPDIR=".gtdiff-tmp"
     mkdir -p "$TMPDIR"
-    OUTPUT_DIR="$TMPDIR"
+    OUTPUT_DIR="$(pwd)/$TMPDIR"
 else
     OUTPUT_DIR="$FILEDIR"
 fi
 
 echo "Generating LaTeX diff for $FILE comparing with $REVISION..."
 
-# Save current directory
-ORIG_DIR=$(pwd)
+# Change to git root for git operations
+cd "$GIT_ROOT"
 
-# Change to file directory for latexdiff-vc
-cd "$FILEDIR"
+# Create temporary file for old version
+OLD_TMP="${OUTPUT_DIR}/${BASENAME}-old-${REVISION//\//-}.tex"
 
-# Run latexdiff-vc
-if [ "$(basename "$FILE")" = "main.tex" ]; then
-    latexdiff-vc --git -r "$REVISION" "$(basename "$FILE")" --flatten 2>/dev/null || {
-        echo "Error: Failed to create diff"
-        cd "$ORIG_DIR"
-        exit 1
-    }
-else
-    latexdiff-vc --git -r "$REVISION" "$(basename "$FILE")" 2>/dev/null || {
-        echo "Error: Failed to create diff"  
-        cd "$ORIG_DIR"
-        exit 1
-    }
-fi
-
-# Go back to original directory
-cd "$ORIG_DIR"
-
-# Move generated files to output directory
-GENERATED_DIFF="${FILEDIR}/${BASENAME}-diff${REVISION}.tex"
-DIFFFILE="${OUTPUT_DIR}/${BASENAME}-diff${REVISION}.tex"
-
-if [ -f "$GENERATED_DIFF" ]; then
-    if [ "$USE_TMP" = true ]; then
-        mv "$GENERATED_DIFF" "$DIFFFILE"
-        # Also move oldtmp files
-        mv "${FILEDIR}/${BASENAME}-oldtmp-"*.tex "$OUTPUT_DIR/" 2>/dev/null || true
-    else
-        DIFFFILE="$GENERATED_DIFF"
-    fi
-else
-    echo "Error: Diff file was not created"
+# Extract old version using git
+git show "${REVISION}:${FILE_RELATIVE}" > "$OLD_TMP" || {
+    echo "Error: Failed to extract old version from git"
     exit 1
+}
+
+# Run latexdiff directly
+if [ "$(basename "$FILE")" = "main.tex" ]; then
+    # For main.tex, we might need special handling
+    latexdiff --flatten "$OLD_TMP" "$FILE_ABS" > "${OUTPUT_DIR}/${BASENAME}-diff${REVISION//\//-}.tex" || {
+        echo "Error: Failed to create diff"
+        rm -f "$OLD_TMP"
+        exit 1
+    }
+else
+    latexdiff "$OLD_TMP" "$FILE_ABS" > "${OUTPUT_DIR}/${BASENAME}-diff${REVISION//\//-}.tex" || {
+        echo "Error: Failed to create diff"
+        rm -f "$OLD_TMP"
+        exit 1
+    }
 fi
+
+# Clean up old tmp file
+rm -f "$OLD_TMP"
+
+# Update the diff file path
+DIFFFILE="${OUTPUT_DIR}/${BASENAME}-diff${REVISION//\//-}.tex"
 
 echo "Created diff file: $DIFFFILE"
 
@@ -151,7 +166,7 @@ echo "Created diff file: $DIFFFILE"
 if [ "$GENERATE_PDF" = true ]; then
     echo "Generating PDF..."
     
-    PDFFILE="${OUTPUT_DIR}/${BASENAME}-diff${REVISION}.pdf"
+    PDFFILE="${OUTPUT_DIR}/${BASENAME}-diff${REVISION//\//-}.pdf"
     
     # Create wrapper for non-main files
     if [ "$(basename "$FILE")" != "main.tex" ]; then
@@ -177,14 +192,13 @@ if [ "$GENERATE_PDF" = true ]; then
 \input{BASENAME-diffREVISION}
 \end{document}
 EOF
-        # Replace placeholders
+        # Replace placeholders - sanitize revision for filename
+        REVISION_SAFE="${REVISION//\//-}"
         sed -i '' "s/BASENAME/${BASENAME}/g" "$WRAPPER"
-        sed -i '' "s/REVISION/${REVISION}/g" "$WRAPPER"
+        sed -i '' "s/REVISION/${REVISION_SAFE}/g" "$WRAPPER"
         
         # Compile in output directory
-        cd "$OUTPUT_DIR"
-        pdflatex -interaction=nonstopmode "$(basename "$WRAPPER")" > /dev/null 2>&1
-        cd "$ORIG_DIR"
+        (cd "$OUTPUT_DIR" && pdflatex -interaction=nonstopmode "$(basename "$WRAPPER")" > /dev/null 2>&1)
         
         # Check for output
         if [ -f "${OUTPUT_DIR}/${BASENAME}-wrapper.pdf" ]; then
@@ -193,10 +207,7 @@ EOF
         fi
     else
         # Compile main.tex directly
-        cd "$OUTPUT_DIR"
-        pdflatex -interaction=nonstopmode "$(basename "$DIFFFILE")" > /dev/null 2>&1
-        pdflatex -interaction=nonstopmode "$(basename "$DIFFFILE")" > /dev/null 2>&1
-        cd "$ORIG_DIR"
+        (cd "$OUTPUT_DIR" && pdflatex -interaction=nonstopmode "$(basename "$DIFFFILE")" > /dev/null 2>&1 && pdflatex -interaction=nonstopmode "$(basename "$DIFFFILE")" > /dev/null 2>&1)
     fi
     
     if [ -f "$PDFFILE" ]; then
@@ -215,8 +226,8 @@ if [ "$CLEANUP" = true ]; then
     if [ "$USE_TMP" = true ]; then
         rm -rf "$OUTPUT_DIR"
     else
-        rm -f "${OUTPUT_DIR}/${BASENAME}-diff${REVISION}".{aux,log,out}
-        rm -f "${OUTPUT_DIR}/${BASENAME}-oldtmp-"*.tex
+        REVISION_SAFE="${REVISION//\//-}"
+        rm -f "${OUTPUT_DIR}/${BASENAME}-diff${REVISION_SAFE}".{aux,log,out}
     fi
 elif [ "$USE_TMP" = true ]; then
     echo ""
