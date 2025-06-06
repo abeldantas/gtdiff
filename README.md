@@ -6,6 +6,8 @@ Compare LaTeX documents between different revisions.
 git gtdiff intro.tex
 ```
 
+![Example of gtdiff output](example.png)
+
 ## What it does
 
 `gtdiff` visualizes changes in LaTeX documents by:
