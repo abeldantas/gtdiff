@@ -16,8 +16,6 @@ git gtdiff intro.tex
 
 ## Installation
 
-### Quick Setup
-
 ```bash
 git clone git@github.com:abeldantas/gtdiff.git
 cd gtdiff
@@ -29,21 +27,6 @@ This will add the following to your git config:
 ```
 [alias]
     gtdiff = !/path/to/gtdiff/gtdiff.sh
-```
-
-### Manual Setup
-
-Add this line to your `~/.gitconfig`:
-
-```
-[alias]
-    gtdiff = !/full/path/to/gtdiff/gtdiff.sh
-```
-
-Or run:
-
-```bash
-git config --global alias.gtdiff '!/full/path/to/gtdiff/gtdiff.sh'
 ```
 
 ## Usage
