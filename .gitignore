@@ -14,3 +14,9 @@
 *.swp
 *.swo
 *~
+
+# Backup files
+*.backup
+*.bak
+*-tmp.*
+.gtdiff-tmp/
